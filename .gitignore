@@ -1,0 +1,27 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.ncrunchproject
+*.DotSettings.user
+
+## Secrets
+appsettings.*.local.json
+secrets.json
+.env
+.env.*
+!.env.example
+
+## Logs
+logs/
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Rider / VS Code
+.idea/
+.vscode/
+*.sln.iml
