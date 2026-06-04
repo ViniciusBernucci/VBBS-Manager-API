@@ -1,0 +1,31 @@
+# Carregado automaticamente pelo Docker Compose no ambiente LOCAL.
+# Não commitar segredos aqui — use o arquivo .env
+
+services:
+
+  postgres:
+    ports:
+      - "5432:5432"   # acesso direto ao banco pelo host (DBeaver, DataGrip, etc.)
+
+  # pgAdmin — só no ambiente local
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: vbbs_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - vbbs_network
+
+  api:
+    ports:
+      - "5001:8080"   # acesso direto à API e ao /hangfire pelo host
+
+  web:
+    ports:
+      - "4200:80"     # frontend disponível em http://localhost:4200

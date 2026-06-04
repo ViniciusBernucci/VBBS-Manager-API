@@ -1,32 +1,53 @@
 services:
+
+  # ── Banco de dados ────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     container_name: vbbs_postgres
     environment:
-      POSTGRES_DB: vbbs_manager_dev
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - vbbs_network
 
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: vbbs_pgadmin
+  # ── Backend ASP.NET Core ──────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vbbs_api
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@vbbs.local
-      PGADMIN_DEFAULT_PASSWORD: admin
-    ports:
-      - "5050:80"
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
+      - ConnectionStrings__Postgres=Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      - Jwt__Secret=${JWT_SECRET}
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - vbbs_network
+
+  # ── Frontend Angular (nginx) ──────────────────────────────────────────────────
+  web:
+    build:
+      context: ../WEB
+      dockerfile: Dockerfile
+    container_name: vbbs_web
+    depends_on:
+      - api
+    networks:
+      - vbbs_network
+
+networks:
+  vbbs_network:
+    driver: bridge
 
 volumes:
   postgres_data:

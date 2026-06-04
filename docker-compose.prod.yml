@@ -1,0 +1,20 @@
+# Produção — usar junto com o compose base:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Requer arquivo .env na mesma pasta com as variáveis de produção.
+
+services:
+
+  postgres:
+    restart: always
+    # Sem port binding — acessível apenas pela rede interna do Docker
+
+  api:
+    restart: always
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+
+  web:
+    restart: always
+    ports:
+      - "80:80"       # HTTP — para HTTPS, configurar reverse proxy (Nginx/Traefik no host)
