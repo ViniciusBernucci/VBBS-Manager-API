@@ -11,8 +11,22 @@ using VBBSManager.Api.Features.Alerts.MarkRead;
 using VBBSManager.Api.Features.Auth.Login;
 using VBBSManager.Api.Features.Auth.RefreshToken;
 using VBBSManager.Api.Features.Creatives.List;
+using VBBSManager.Api.Features.Financial.CashFlow.CreateTransaction;
+using VBBSManager.Api.Features.Financial.CashFlow.DeleteTransaction;
+using VBBSManager.Api.Features.Financial.CashFlow.GetCashFlow;
+using VBBSManager.Api.Features.Financial.CashFlow.SetConfig;
+using VBBSManager.Api.Features.Financial.CashFlow.UpdateTransaction;
+using VBBSManager.Api.Features.Financial.FixedExpenses.List;
+using VBBSManager.Api.Features.Financial.FixedExpenses.MonthlyStatus;
+using VBBSManager.Api.Features.Financial.FixedExpenses.Pay;
+using VBBSManager.Api.Features.Financial.FixedExpenses.Save;
+using VBBSManager.Api.Features.Financial.DailySales;
 using VBBSManager.Api.Features.Financial.DRE;
 using VBBSManager.Api.Features.Financial.Overview;
+using VBBSManager.Api.Features.Planning.Financial.Get;
+using VBBSManager.Api.Features.Planning.Financial.Update;
+using VBBSManager.Api.Features.Planning.Goals.Get;
+using VBBSManager.Api.Features.Planning.Goals.Update;
 using VBBSManager.Api.Features.Webhooks.Brevo;
 using VBBSManager.Api.Features.Webhooks.Hotmart;
 using VBBSManager.Infrastructure.ExternalClients.Hotmart;
@@ -22,6 +36,24 @@ namespace VBBSManager.Api.Common.Extensions;
 
 public static class ServiceCollectionExtensions
 {
+    public static IServiceCollection AddCorsPolicy(this IServiceCollection services, IConfiguration config)
+    {
+        var origins = config.GetSection("Cors:AllowedOrigins").Get<string[]>()
+                      ?? ["http://localhost:4200"];
+
+        services.AddCors(options =>
+        {
+            options.AddDefaultPolicy(policy =>
+            {
+                policy.WithOrigins(origins)
+                      .AllowAnyHeader()
+                      .AllowAnyMethod();
+            });
+        });
+
+        return services;
+    }
+
     public static IServiceCollection AddDatabase(this IServiceCollection services, IConfiguration config)
     {
         services.AddDbContext<AppDbContext>(opt =>
@@ -65,16 +97,31 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddExternalClients(this IServiceCollection services)
+    public static IServiceCollection AddExternalClients(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddHttpClient<IHotmartClient, HotmartClient>()
-            .AddTransientHttpErrorPolicy(p => p.WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))));
+        services.Configure<HotmartSettings>(options =>
+        {
+            options.ClientId = configuration["HOTMART_CLIENT_ID"] ?? string.Empty;
+            options.ClientSecret = configuration["HOTMART_CLIENT_SECRET"] ?? string.Empty;
+        });
+
+        services.AddHttpClient<IHotmartAuthClient, HotmartAuthClient>(client =>
+            client.BaseAddress = new Uri("https://api-sec-vlc.hotmart.com"));
+
+        services.AddHttpClient<IHotmartClient, HotmartClient>(client =>
+            client.BaseAddress = new Uri("https://developers.hotmart.com/payments/api/v1/"))
+            .AddTransientHttpErrorPolicy(p =>
+                p.WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))));
+
+        services.AddScoped<IHotmartSalesService, HotmartSalesService>();
 
         return services;
     }
 
     public static IServiceCollection AddFeatureServices(this IServiceCollection services)
     {
+        services.AddScoped<IGetDailySalesService, GetDailySalesService>();
+        services.AddScoped<ISyncDailySalesService, SyncDailySalesService>();
         services.AddScoped<ILoginService, LoginService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
         services.AddScoped<IFinancialOverviewService, FinancialOverviewService>();
@@ -84,6 +131,19 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IMarkAlertReadService, MarkAlertReadService>();
         services.AddScoped<IHotmartWebhookService, HotmartWebhookService>();
         services.AddScoped<IBrevoWebhookService, BrevoWebhookService>();
+        services.AddScoped<IGetPlanningGoalsService, GetPlanningGoalsService>();
+        services.AddScoped<IUpdatePlanningGoalsService, UpdatePlanningGoalsService>();
+        services.AddScoped<IGetFinancialConfigService, GetFinancialConfigService>();
+        services.AddScoped<IUpdateFinancialConfigService, UpdateFinancialConfigService>();
+        services.AddScoped<IGetCashFlowService, GetCashFlowService>();
+        services.AddScoped<ISetCashFlowConfigService, SetCashFlowConfigService>();
+        services.AddScoped<ICreateTransactionService, CreateTransactionService>();
+        services.AddScoped<IUpdateTransactionService, UpdateTransactionService>();
+        services.AddScoped<IDeleteTransactionService, DeleteTransactionService>();
+        services.AddScoped<IListFixedExpensesService, ListFixedExpensesService>();
+        services.AddScoped<ISaveFixedExpenseService, SaveFixedExpenseService>();
+        services.AddScoped<IPayFixedExpenseService, PayFixedExpenseService>();
+        services.AddScoped<IGetMonthlyStatusService, GetMonthlyStatusService>();
 
         return services;
     }

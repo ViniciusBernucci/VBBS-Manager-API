@@ -10,6 +10,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Integration> Integrations => Set<Integration>();
     public DbSet<Alert> Alerts => Set<Alert>();
+    public DbSet<PlanningGoal> PlanningGoals => Set<PlanningGoal>();
+    public DbSet<FinancialConfig> FinancialConfigs => Set<FinancialConfig>();
+    public DbSet<CashFlowTransaction> CashFlowTransactions => Set<CashFlowTransaction>();
+    public DbSet<CashFlowConfig> CashFlowConfigs => Set<CashFlowConfig>();
+    public DbSet<FixedExpense> FixedExpenses => Set<FixedExpense>();
+    public DbSet<FixedExpensePayment> FixedExpensePayments => Set<FixedExpensePayment>();
+    public DbSet<DailySalesSummary> DailySalesSummaries => Set<DailySalesSummary>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

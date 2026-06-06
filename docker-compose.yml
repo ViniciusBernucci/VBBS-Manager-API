@@ -28,6 +28,8 @@ services:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
       - ConnectionStrings__Postgres=Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       - Jwt__Secret=${JWT_SECRET}
+      - HOTMART_CLIENT_ID=${HOTMART_CLIENT_ID}
+      - HOTMART_CLIENT_SECRET=${HOTMART_CLIENT_SECRET}
     depends_on:
       postgres:
         condition: service_healthy

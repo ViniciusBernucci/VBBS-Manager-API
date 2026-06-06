@@ -1,5 +1,7 @@
 # Clients de API Externa
 
+> **Ordem de leitura:** documento **11** da [Trilha de Aprendizado](./00-trilha-de-aprendizado.md).
+
 Cada integração externa tem uma classe isolada em `VBBSManager.Infrastructure/ExternalClients/`.
 
 ---
@@ -19,11 +21,15 @@ Nenhum Service de negócio chama `HttpClient` diretamente. Todo acesso a API ext
 
 ### HotmartClient
 
-**Arquivo:** `src/VBBSManager.Infrastructure/ExternalClients/Hotmart/HotmartClient.cs`
+**Documentação completa (para iniciantes):** [Integração Hotmart — Histórico de Vendas](./12-integracao-hotmart-vendas.md)
 
-| Método | Descrição |
-|---|---|
-| `GetSalesAsync(accessToken, from, to, ct)` | Histórico de vendas por período |
+**Arquivos:** `src/VBBSManager.Infrastructure/ExternalClients/Hotmart/`
+
+| Classe / Interface | Método | Descrição |
+|---|---|---|
+| `IHotmartAuthClient` | `GetAccessTokenAsync(ct)` | OAuth 2.0 Client Credentials |
+| `IHotmartClient` | `GetSalesPageAsync(token, startMs, endMs, pageToken, ct)` | Uma página do histórico de vendas |
+| `IHotmartSalesService` | `GetConsolidatedReportAsync(start, end, ct)` | Auth + paginação + consolidação (total de vendas e receita por moeda) |
 
 O `HttpClient` é injetado com retry via Polly configurado em `ServiceCollectionExtensions`:
 

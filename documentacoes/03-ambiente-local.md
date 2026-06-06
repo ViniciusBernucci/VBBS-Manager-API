@@ -1,5 +1,7 @@
 # Ambiente de Desenvolvimento Local
 
+> **Ordem de leitura:** este é o **documento 03** da [Trilha de Aprendizado](./00-trilha-de-aprendizado.md). Leia antes o [01-aula-fundamentos-web-api.md](./01-aula-fundamentos-web-api.md).
+
 ---
 
 ## Pré-requisitos

@@ -1,7 +1,10 @@
+using DotNetEnv;
 using Hangfire;
 using Serilog;
 using VBBSManager.Api.Common.Extensions;
 using VBBSManager.Api.Common.Middleware;
+
+Env.TraversePath().Load();
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -18,11 +21,15 @@ try
         .WriteTo.Console()
         .WriteTo.File("logs/api-.log", rollingInterval: RollingInterval.Day));
 
-    builder.Services.AddControllers();
+    builder.Services.AddControllers()
+        .AddJsonOptions(opts =>
+            opts.JsonSerializerOptions.Converters.Add(
+                new System.Text.Json.Serialization.JsonStringEnumConverter()));
+    builder.Services.AddCorsPolicy(builder.Configuration);
     builder.Services.AddDatabase(builder.Configuration);
     builder.Services.AddJwtAuth(builder.Configuration);
     builder.Services.AddHangfire(builder.Configuration);
-    builder.Services.AddExternalClients();
+    builder.Services.AddExternalClients(builder.Configuration);
     builder.Services.AddFeatureServices();
     builder.Services.AddSwagger();
     builder.Services.AddEndpointsApiExplorer();
@@ -36,6 +43,7 @@ try
     }
 
     app.UseMiddleware<ExceptionMiddleware>();
+    app.UseCors();
     app.UseAuthentication();
     app.UseMiddleware<TenantMiddleware>();
     app.UseAuthorization();

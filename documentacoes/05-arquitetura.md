@@ -1,5 +1,7 @@
 # Arquitetura do Sistema
 
+> **Ordem de leitura:** documento **05** da [Trilha de Aprendizado](./00-trilha-de-aprendizado.md). Leia após [04-aula-dotnet-conceitos.md](./04-aula-dotnet-conceitos.md).
+
 ## Visão geral
 
 O sistema é composto por três projetos .NET dentro de uma única solution:
