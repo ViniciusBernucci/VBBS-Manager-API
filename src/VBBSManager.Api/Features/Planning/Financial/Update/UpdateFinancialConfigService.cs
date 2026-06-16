@@ -23,6 +23,7 @@ public class UpdateFinancialConfigService(AppDbContext db, ILogger<UpdateFinanci
         config.MonthlyGrossRevenue = request.MonthlyGrossRevenue;
         config.MonthlyAdSpend = request.MonthlyAdSpend;
         config.HotmartFeePercent = request.HotmartFeePercent;
+        config.HotmartFixedFeePerTransaction = request.HotmartFixedFeePerTransaction;
         config.InstallmentFeePercent = request.InstallmentFeePercent;
         config.InstallmentSalesPercent = request.InstallmentSalesPercent;
         config.FederalTaxPercent = request.FederalTaxPercent;

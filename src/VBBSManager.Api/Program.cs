@@ -1,8 +1,10 @@
 using DotNetEnv;
 using Hangfire;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 using VBBSManager.Api.Common.Extensions;
 using VBBSManager.Api.Common.Middleware;
+using VBBSManager.Infrastructure.Persistence;
 
 Env.TraversePath().Load();
 
@@ -35,6 +37,13 @@ try
     builder.Services.AddEndpointsApiExplorer();
 
     var app = builder.Build();
+
+    // Aplica migrations pendentes automaticamente na inicialização
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await db.Database.MigrateAsync();
+    }
 
     if (app.Environment.IsDevelopment())
     {

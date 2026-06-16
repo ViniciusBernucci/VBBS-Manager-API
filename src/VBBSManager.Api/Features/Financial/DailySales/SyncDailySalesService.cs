@@ -9,7 +9,7 @@ namespace VBBSManager.Api.Features.Financial.DailySales;
 
 public interface ISyncDailySalesService
 {
-    Task<Result<DailySalesResponse>> ExecuteAsync(Guid tenantId, DateOnly? date, CancellationToken ct);
+    Task<Result<DailySalesSyncResponse>> ExecuteAsync(Guid tenantId, int year, int month, CancellationToken ct);
 }
 
 public class SyncDailySalesService(
@@ -17,85 +17,84 @@ public class SyncDailySalesService(
     IHotmartSalesService hotmartSalesService,
     ILogger<SyncDailySalesService> logger) : ISyncDailySalesService
 {
-    public async Task<Result<DailySalesResponse>> ExecuteAsync(Guid tenantId, DateOnly? date, CancellationToken ct)
+    public async Task<Result<DailySalesSyncResponse>> ExecuteAsync(
+        Guid tenantId, int year, int month, CancellationToken ct)
     {
-        var today = date ?? TodaySaoPaulo();
-        var (startDate, endDate) = SaoPauloDayToUtc(today);
+        if (year < 2020 || year > DateTime.UtcNow.Year + 1)
+            return Result<DailySalesSyncResponse>.Fail("Ano inválido.");
+
+        if (month < 1 || month > 12)
+            return Result<DailySalesSyncResponse>.Fail("Mês inválido (1–12).");
+
+        var since = new DateOnly(year, month, 1);
+        var until = new DateOnly(year, month, DateTime.DaysInMonth(year, month));
+
+        // Hotmart API range: cover full month in São Paulo time (UTC-3)
+        // Month start SP midnight = UTC+3h; month end SP 23:59 = next day UTC 02:59
+        var utcStart = DateTime.SpecifyKind(since.ToDateTime(TimeOnly.MinValue).AddHours(3), DateTimeKind.Utc);
+        var utcEnd   = DateTime.SpecifyKind(until.ToDateTime(TimeOnly.MaxValue).AddHours(3), DateTimeKind.Utc);
 
         logger.LogInformation(
-            "Syncing Hotmart daily sales for tenant {TenantId}, date {Date}",
-            tenantId, today);
+            "Hotmart month sync — tenant {TenantId}, {Year}/{Month:D2}",
+            tenantId, year, month);
 
-        SalesConsolidatedReport report;
+        List<DailySaleData> dailySales;
         try
         {
-            report = await hotmartSalesService.GetConsolidatedReportAsync(startDate, endDate, ct);
+            dailySales = await hotmartSalesService.GetSalesByDayAsync(utcStart, utcEnd, ct);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Hotmart sync failed for tenant {TenantId}", tenantId);
-            return Result<DailySalesResponse>.Fail(
+            return Result<DailySalesSyncResponse>.Fail(
                 "Não foi possível conectar à API da Hotmart. Verifique as credenciais.");
         }
 
-        // Usa valores reais da API: base = produto sem taxa cartão, total = taxa Hotmart real
-        var grossRevenue     = report.TotalRevenueByCurrency.TryGetValue("BRL", out var brl)
-            ? brl : report.TotalRevenueByCurrency.Values.Sum();
-        var hotmartFeeAmount = report.TotalHotmartFeeByCurrency.TryGetValue("BRL", out var fee)
-            ? fee : report.TotalHotmartFeeByCurrency.Values.Sum();
-
-        // Taxa fixa adicional de R$ 0,59 por transação cobrada pela Hotmart
-        const decimal HotmartFixedFeePerSale = 0.59m;
-        hotmartFeeAmount += HotmartFixedFeePerSale * report.TotalSales;
-
-        var netRevenue = grossRevenue - hotmartFeeAmount;
         var now = DateTime.UtcNow;
 
-        var existing = await db.DailySalesSummaries
-            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Date == today, ct);
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
-        if (existing is not null)
+        // Delete all records for this month and reinsert
+        await db.DailySalesSummaries
+            .Where(x => x.TenantId == tenantId && x.Date >= since && x.Date <= until)
+            .ExecuteDeleteAsync(ct);
+
+        foreach (var day in dailySales)
         {
-            existing.TotalSales = report.TotalSales;
-            existing.GrossRevenue = grossRevenue;
-            existing.NetRevenue = netRevenue;
-            existing.HotmartFeeAmount = hotmartFeeAmount;
-            existing.LastSyncedAt = now;
-            existing.UpdatedAt = now;
-        }
-        else
-        {
+            // Only sync days within the requested month (API might return edge cases)
+            if (day.Date < since || day.Date > until) continue;
+
+            // hotmart_fee.total já inclui taxa fixa + taxa percentual — sem adição extra
+            var hotmartFee = day.HotmartFeeAmount;
+            var netRevenue = day.GrossRevenue - hotmartFee;
+
             db.DailySalesSummaries.Add(new DailySalesSummary
             {
-                TenantId = tenantId,
-                Date = today,
-                TotalSales = report.TotalSales,
-                GrossRevenue = grossRevenue,
-                NetRevenue = netRevenue,
-                HotmartFeeAmount = hotmartFeeAmount,
-                LastSyncedAt = now,
+                TenantId         = tenantId,
+                Date             = day.Date,
+                TotalSales       = day.TotalSales,
+                GrossRevenue     = day.GrossRevenue,
+                NetRevenue       = netRevenue,
+                HotmartFeeAmount = hotmartFee,
+                LastSyncedAt     = now,
             });
         }
 
         await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+
+        var totalSales = dailySales.Sum(x => x.TotalSales);
+        var days       = dailySales.Count;
 
         logger.LogInformation(
-            "Hotmart sync complete for tenant {TenantId}: {TotalSales} sales, gross {GrossRevenue}",
-            tenantId, report.TotalSales, grossRevenue);
+            "Hotmart sync complete — {Days} days, {TotalSales} total sales ({Since} a {Until})",
+            days, totalSales, since, until);
 
-        return Result<DailySalesResponse>.Ok(
-            new DailySalesResponse(today, report.TotalSales, grossRevenue, netRevenue, hotmartFeeAmount, now));
-    }
-
-    // São Paulo = UTC-3. Brasil não adota horário de verão desde 2019.
-    private static DateOnly TodaySaoPaulo()
-        => DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-3));
-
-    private static (DateTime utcStart, DateTime utcEnd) SaoPauloDayToUtc(DateOnly date)
-    {
-        // 00:00 SP = 03:00 UTC  |  23:59:59 SP = (dia seguinte) 02:59:59 UTC
-        var start = DateTime.SpecifyKind(date.ToDateTime(TimeOnly.MinValue).AddHours(3), DateTimeKind.Utc);
-        var end   = DateTime.SpecifyKind(date.ToDateTime(TimeOnly.MaxValue).AddHours(3), DateTimeKind.Utc);
-        return (start, end);
+        return Result<DailySalesSyncResponse>.Ok(new DailySalesSyncResponse(
+            DaysSynced: days,
+            TotalSales: totalSales,
+            Since:      since.ToString("yyyy-MM-dd"),
+            Until:      until.ToString("yyyy-MM-dd"),
+            Message:    $"Sincronizado: {days} dias com {totalSales} venda(s) no total"));
     }
 }

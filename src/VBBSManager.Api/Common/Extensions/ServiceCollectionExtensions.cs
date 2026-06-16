@@ -27,9 +27,12 @@ using VBBSManager.Api.Features.Planning.Financial.Get;
 using VBBSManager.Api.Features.Planning.Financial.Update;
 using VBBSManager.Api.Features.Planning.Goals.Get;
 using VBBSManager.Api.Features.Planning.Goals.Update;
+using VBBSManager.Api.Features.Traffic.Overview;
+using VBBSManager.Api.Features.Traffic.Sync;
 using VBBSManager.Api.Features.Webhooks.Brevo;
 using VBBSManager.Api.Features.Webhooks.Hotmart;
 using VBBSManager.Infrastructure.ExternalClients.Hotmart;
+using VBBSManager.Infrastructure.ExternalClients.Meta;
 using VBBSManager.Infrastructure.Persistence;
 
 namespace VBBSManager.Api.Common.Extensions;
@@ -115,6 +118,24 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IHotmartSalesService, HotmartSalesService>();
 
+        // Meta Ads
+        services.Configure<MetaSettings>(options =>
+        {
+            options.AccessToken = configuration["FACEBOOK_TOKEN"] ?? string.Empty;
+            options.AdAccountId = configuration["FACEBOOK_AD_ACCOUNT_ID"] ?? string.Empty;
+        });
+
+        var metaApiVersion = configuration["FACEBOOK_API_VERSION"] ?? "v25.0";
+        services.AddHttpClient<IMetaAdsClient, MetaAdsClient>(client =>
+        {
+            client.BaseAddress = new Uri($"https://graph.facebook.com/{metaApiVersion}/");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        })
+        .AddTransientHttpErrorPolicy(p =>
+            p.WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))));
+
+        services.AddScoped<IMetaAdsMonthSyncService, MetaAdsMonthSyncService>();
+
         return services;
     }
 
@@ -144,6 +165,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISaveFixedExpenseService, SaveFixedExpenseService>();
         services.AddScoped<IPayFixedExpenseService, PayFixedExpenseService>();
         services.AddScoped<IGetMonthlyStatusService, GetMonthlyStatusService>();
+        services.AddScoped<ITrafficSyncService, TrafficSyncService>();
+        services.AddScoped<ITrafficOverviewService, TrafficOverviewService>();
 
         return services;
     }

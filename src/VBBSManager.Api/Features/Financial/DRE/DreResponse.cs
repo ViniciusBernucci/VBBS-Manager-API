@@ -4,12 +4,14 @@ public record DreResponse(
     int Year,
     int Month,
     bool HasData,
+    bool MetaAdsSynced,
     DreSummary Summary,
     IReadOnlyList<DreLineDto> Lines,
     IReadOnlyList<DreDataPoint> WeeklyEvolution
 );
 
 public record DreSummary(
+    int TotalSales,
     decimal GrossRevenue,
     decimal NetRevenue,
     decimal OperationalProfit,

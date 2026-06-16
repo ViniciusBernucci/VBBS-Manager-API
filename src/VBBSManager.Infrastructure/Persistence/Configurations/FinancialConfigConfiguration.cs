@@ -21,6 +21,7 @@ public class FinancialConfigConfiguration : IEntityTypeConfiguration<FinancialCo
         builder.Property(c => c.InvoicingCost).HasPrecision(18, 2);
         builder.Property(c => c.ManychatCost).HasPrecision(18, 2);
         builder.Property(c => c.HotmartPlayerCost).HasPrecision(18, 2);
+        builder.Property(c => c.HotmartFixedFeePerTransaction).HasPrecision(10, 4);
 
         // Only one config per tenant
         builder.HasIndex(c => c.TenantId).IsUnique();

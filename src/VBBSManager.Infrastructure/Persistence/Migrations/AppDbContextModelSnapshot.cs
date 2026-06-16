@@ -22,6 +22,108 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
 
         NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+        modelBuilder.Entity("VBBSManager.Domain.Entities.MetaCampaignDailyInsight", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+            b.Property<Guid>("TenantId").HasColumnType("uuid");
+            b.Property<DateOnly>("Date").HasColumnType("date");
+            b.Property<string>("CampaignId").IsRequired().HasMaxLength(50).HasColumnType("character varying(50)");
+            b.Property<string>("CampaignName").IsRequired().HasMaxLength(500).HasColumnType("character varying(500)");
+            b.Property<long>("Impressions").HasColumnType("bigint").HasDefaultValue(0L);
+            b.Property<long>("Clicks").HasColumnType("bigint").HasDefaultValue(0L);
+            b.Property<long>("Reach").HasColumnType("bigint").HasDefaultValue(0L);
+            b.Property<decimal>("Spend").HasPrecision(18, 2).HasColumnType("numeric(18,2)").HasDefaultValue(0m);
+            b.Property<decimal?>("Cpc").HasPrecision(18, 4).HasColumnType("numeric(18,4)");
+            b.Property<decimal?>("Cpm").HasPrecision(18, 4).HasColumnType("numeric(18,4)");
+            b.Property<decimal?>("Ctr").HasPrecision(10, 4).HasColumnType("numeric(10,4)");
+            b.Property<decimal?>("Frequency").HasPrecision(10, 4).HasColumnType("numeric(10,4)");
+            b.Property<int>("Conversions").HasColumnType("integer").HasDefaultValue(0);
+            b.Property<decimal>("Revenue").HasPrecision(18, 2).HasColumnType("numeric(18,2)").HasDefaultValue(0m);
+            b.Property<DateTime>("LastSyncedAt").HasColumnType("timestamp with time zone");
+            b.Property<DateTime>("CreatedAt").HasColumnType("timestamp with time zone");
+            b.Property<DateTime?>("UpdatedAt").HasColumnType("timestamp with time zone");
+            b.HasKey("Id");
+            b.HasIndex("TenantId", "CampaignId", "Date").IsUnique();
+            b.HasIndex("TenantId", "Date");
+            b.ToTable("MetaCampaignDailyInsights");
+        });
+
+        modelBuilder.Entity("VBBSManager.Domain.Entities.MetaAdSetDailyInsight", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+            b.Property<Guid>("TenantId").HasColumnType("uuid");
+            b.Property<DateOnly>("Date").HasColumnType("date");
+            b.Property<string>("CampaignId").IsRequired().HasMaxLength(50).HasColumnType("character varying(50)");
+            b.Property<string>("CampaignName").IsRequired().HasMaxLength(500).HasColumnType("character varying(500)");
+            b.Property<string>("AdSetId").IsRequired().HasMaxLength(50).HasColumnType("character varying(50)");
+            b.Property<string>("AdSetName").IsRequired().HasMaxLength(500).HasColumnType("character varying(500)");
+            b.Property<long>("Impressions").HasColumnType("bigint").HasDefaultValue(0L);
+            b.Property<long>("Clicks").HasColumnType("bigint").HasDefaultValue(0L);
+            b.Property<long>("Reach").HasColumnType("bigint").HasDefaultValue(0L);
+            b.Property<decimal>("Spend").HasPrecision(18, 2).HasColumnType("numeric(18,2)").HasDefaultValue(0m);
+            b.Property<decimal?>("Cpc").HasPrecision(18, 4).HasColumnType("numeric(18,4)");
+            b.Property<decimal?>("Cpm").HasPrecision(18, 4).HasColumnType("numeric(18,4)");
+            b.Property<decimal?>("Ctr").HasPrecision(10, 4).HasColumnType("numeric(10,4)");
+            b.Property<decimal?>("Frequency").HasPrecision(10, 4).HasColumnType("numeric(10,4)");
+            b.Property<int>("Conversions").HasColumnType("integer").HasDefaultValue(0);
+            b.Property<decimal>("Revenue").HasPrecision(18, 2).HasColumnType("numeric(18,2)").HasDefaultValue(0m);
+            b.Property<DateTime>("LastSyncedAt").HasColumnType("timestamp with time zone");
+            b.Property<DateTime>("CreatedAt").HasColumnType("timestamp with time zone");
+            b.Property<DateTime?>("UpdatedAt").HasColumnType("timestamp with time zone");
+            b.HasKey("Id");
+            b.HasIndex("TenantId", "AdSetId", "Date").IsUnique();
+            b.HasIndex("TenantId", "Date");
+            b.ToTable("MetaAdSetDailyInsights");
+        });
+
+        modelBuilder.Entity("VBBSManager.Domain.Entities.MetaAdDailyInsight", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+            b.Property<Guid>("TenantId").HasColumnType("uuid");
+            b.Property<DateOnly>("Date").HasColumnType("date");
+            b.Property<string>("CampaignId").IsRequired().HasMaxLength(50).HasColumnType("character varying(50)");
+            b.Property<string>("CampaignName").IsRequired().HasMaxLength(500).HasColumnType("character varying(500)");
+            b.Property<string>("AdSetId").IsRequired().HasMaxLength(50).HasColumnType("character varying(50)");
+            b.Property<string>("AdSetName").IsRequired().HasMaxLength(500).HasColumnType("character varying(500)");
+            b.Property<string>("AdId").IsRequired().HasMaxLength(50).HasColumnType("character varying(50)");
+            b.Property<string>("AdName").IsRequired().HasMaxLength(500).HasColumnType("character varying(500)");
+            b.Property<long>("Impressions").HasColumnType("bigint").HasDefaultValue(0L);
+            b.Property<long>("Clicks").HasColumnType("bigint").HasDefaultValue(0L);
+            b.Property<long>("Reach").HasColumnType("bigint").HasDefaultValue(0L);
+            b.Property<decimal>("Spend").HasPrecision(18, 2).HasColumnType("numeric(18,2)").HasDefaultValue(0m);
+            b.Property<decimal?>("Cpc").HasPrecision(18, 4).HasColumnType("numeric(18,4)");
+            b.Property<decimal?>("Cpm").HasPrecision(18, 4).HasColumnType("numeric(18,4)");
+            b.Property<decimal?>("Ctr").HasPrecision(10, 4).HasColumnType("numeric(10,4)");
+            b.Property<decimal?>("Frequency").HasPrecision(10, 4).HasColumnType("numeric(10,4)");
+            b.Property<int>("Conversions").HasColumnType("integer").HasDefaultValue(0);
+            b.Property<decimal>("Revenue").HasPrecision(18, 2).HasColumnType("numeric(18,2)").HasDefaultValue(0m);
+            b.Property<DateTime>("LastSyncedAt").HasColumnType("timestamp with time zone");
+            b.Property<DateTime>("CreatedAt").HasColumnType("timestamp with time zone");
+            b.Property<DateTime?>("UpdatedAt").HasColumnType("timestamp with time zone");
+            b.HasKey("Id");
+            b.HasIndex("TenantId", "AdId", "Date").IsUnique();
+            b.HasIndex("TenantId", "Date");
+            b.ToTable("MetaAdDailyInsights");
+        });
+
+        modelBuilder.Entity("VBBSManager.Domain.Entities.DailyAdSpendSummary", b =>
+        {
+            b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
+            b.Property<Guid>("TenantId").HasColumnType("uuid");
+            b.Property<DateOnly>("Date").HasColumnType("date");
+            b.Property<decimal>("TotalSpend").HasPrecision(18, 2).HasColumnType("numeric(18,2)").HasDefaultValue(0m);
+            b.Property<long>("TotalImpressions").HasColumnType("bigint").HasDefaultValue(0L);
+            b.Property<long>("TotalClicks").HasColumnType("bigint").HasDefaultValue(0L);
+            b.Property<int>("TotalConversions").HasColumnType("integer").HasDefaultValue(0);
+            b.Property<decimal>("TotalRevenue").HasPrecision(18, 2).HasColumnType("numeric(18,2)").HasDefaultValue(0m);
+            b.Property<DateTime>("LastSyncedAt").HasColumnType("timestamp with time zone");
+            b.Property<DateTime>("CreatedAt").HasColumnType("timestamp with time zone");
+            b.Property<DateTime?>("UpdatedAt").HasColumnType("timestamp with time zone");
+            b.HasKey("Id");
+            b.HasIndex("TenantId", "Date").IsUnique();
+            b.ToTable("DailyAdSpendSummaries");
+        });
+
         modelBuilder.Entity("VBBSManager.Domain.Entities.DailySalesSummary", b =>
         {
             b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
@@ -64,6 +166,7 @@ partial class AppDbContextModelSnapshot : ModelSnapshot
             b.Property<DateTime>("CreatedAt").HasColumnType("timestamp with time zone");
             b.Property<decimal>("FederalTaxPercent").HasPrecision(5, 4).HasColumnType("numeric(5,4)");
             b.Property<decimal>("HotmartFeePercent").HasPrecision(5, 4).HasColumnType("numeric(5,4)");
+            b.Property<decimal>("HotmartFixedFeePerTransaction").HasPrecision(10, 4).HasColumnType("numeric(10,4)");
             b.Property<decimal>("HotmartPlayerCost").HasPrecision(18, 2).HasColumnType("numeric(18,2)");
             b.Property<decimal>("InstallmentFeePercent").HasPrecision(5, 4).HasColumnType("numeric(5,4)");
             b.Property<decimal>("InstallmentSalesPercent").HasPrecision(5, 4).HasColumnType("numeric(5,4)");

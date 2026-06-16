@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace VBBSManager.Infrastructure.Persistence.Migrations;
 
+[Migration("20260605160000_AddDailySalesSummary")]
 public partial class AddDailySalesSummary : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)

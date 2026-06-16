@@ -30,6 +30,9 @@ services:
       - Jwt__Secret=${JWT_SECRET}
       - HOTMART_CLIENT_ID=${HOTMART_CLIENT_ID}
       - HOTMART_CLIENT_SECRET=${HOTMART_CLIENT_SECRET}
+      - FACEBOOK_TOKEN=${FACEBOOK_TOKEN}
+      - FACEBOOK_AD_ACCOUNT_ID=${FACEBOOK_AD_ACCOUNT_ID}
+      - FACEBOOK_API_VERSION=${FACEBOOK_API_VERSION}
     depends_on:
       postgres:
         condition: service_healthy

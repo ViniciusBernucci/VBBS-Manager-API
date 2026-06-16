@@ -1,0 +1,27 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using VBBSManager.Domain.Entities;
+
+namespace VBBSManager.Infrastructure.Persistence.Configurations;
+
+public class MetaAdSetDailyInsightConfiguration : IEntityTypeConfiguration<MetaAdSetDailyInsight>
+{
+    public void Configure(EntityTypeBuilder<MetaAdSetDailyInsight> builder)
+    {
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.CampaignId).HasMaxLength(50).IsRequired();
+        builder.Property(x => x.CampaignName).HasMaxLength(500).IsRequired();
+        builder.Property(x => x.AdSetId).HasMaxLength(50).IsRequired();
+        builder.Property(x => x.AdSetName).HasMaxLength(500).IsRequired();
+        builder.Property(x => x.Date).HasColumnType("date");
+        builder.Property(x => x.Spend).HasPrecision(18, 2);
+        builder.Property(x => x.Revenue).HasPrecision(18, 2);
+        builder.Property(x => x.Cpc).HasPrecision(18, 4);
+        builder.Property(x => x.Cpm).HasPrecision(18, 4);
+        builder.Property(x => x.Ctr).HasPrecision(10, 4);
+        builder.Property(x => x.Frequency).HasPrecision(10, 4);
+
+        builder.HasIndex(x => new { x.TenantId, x.AdSetId, x.Date }).IsUnique();
+        builder.HasIndex(x => new { x.TenantId, x.Date });
+    }
+}

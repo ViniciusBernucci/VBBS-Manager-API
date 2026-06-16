@@ -14,4 +14,5 @@ public class FinancialConfig : BaseEntity
     public decimal InvoicingCost { get; set; }
     public decimal ManychatCost { get; set; }
     public decimal HotmartPlayerCost { get; set; }
+    public decimal HotmartFixedFeePerTransaction { get; set; }
 }

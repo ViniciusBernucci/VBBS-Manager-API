@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace VBBSManager.Infrastructure.Persistence.Migrations;
 
+[Migration("20260605130000_AddCashFlow")]
 public partial class AddCashFlow : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)

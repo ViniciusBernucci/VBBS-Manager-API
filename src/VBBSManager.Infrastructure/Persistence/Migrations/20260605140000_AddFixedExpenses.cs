@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace VBBSManager.Infrastructure.Persistence.Migrations;
 
+[Migration("20260605140000_AddFixedExpenses")]
 public partial class AddFixedExpenses : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)

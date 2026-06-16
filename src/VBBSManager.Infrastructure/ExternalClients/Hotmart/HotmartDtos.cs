@@ -18,7 +18,10 @@ public record HotmartSaleItem(
 
 public record HotmartPurchase(
     [property: JsonPropertyName("price")] HotmartPrice? Price,
-    [property: JsonPropertyName("hotmart_fee")] HotmartFee? HotmartFee);
+    [property: JsonPropertyName("hotmart_fee")] HotmartFee? HotmartFee,
+    [property: JsonPropertyName("approved_date")] long? ApprovedDate,
+    [property: JsonPropertyName("order_date")] long? OrderDate,
+    [property: JsonPropertyName("purchase_date")] long? PurchaseDate);
 
 public record HotmartPrice(
     [property: JsonPropertyName("value")] decimal Value,
@@ -37,3 +40,5 @@ public record SalesConsolidatedReport(
     int TotalSales,
     IReadOnlyDictionary<string, decimal> TotalRevenueByCurrency,
     IReadOnlyDictionary<string, decimal> TotalHotmartFeeByCurrency);
+
+public record DailySaleData(DateOnly Date, int TotalSales, decimal GrossRevenue, decimal HotmartFeeAmount);

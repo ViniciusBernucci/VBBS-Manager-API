@@ -1,24 +1,49 @@
 using Hangfire;
 using Microsoft.Extensions.Logging;
+using VBBSManager.Infrastructure.ExternalClients.Meta;
 
 namespace VBBSManager.Infrastructure.Jobs;
 
-public class MetaAdsSyncJob(ILogger<MetaAdsSyncJob> logger)
+public class MetaAdsSyncJob(
+    IMetaAdsMonthSyncService syncService,
+    ILogger<MetaAdsSyncJob> logger)
 {
     public const string JobId = "meta-ads-sync";
 
-    [AutomaticRetry(Attempts = 3, DelaysInSeconds = [60, 300, 900])]
+    [AutomaticRetry(Attempts = 3, DelaysInSeconds = [300, 900, 1800])]
     public async Task ExecuteAsync(Guid tenantId, CancellationToken ct = default)
     {
-        logger.LogInformation("Starting Meta Ads sync for tenant {TenantId}", tenantId);
+        var now = DateTime.UtcNow;
 
-        // TODO: buscar credenciais Meta do tenant no banco (criptografadas)
-        // TODO: chamar MetaAdsClient para obter métricas de campanhas e criativos
-        // TODO: persistir métricas no banco com tenant_id
-        // TODO: avaliar semáforo e gerar alertas se necessário
+        logger.LogInformation(
+            "Meta Ads sync job iniciado — tenant {TenantId}, mês {Year}/{Month}",
+            tenantId, now.Year, now.Month);
 
-        await Task.CompletedTask;
+        try
+        {
+            var summary = await syncService.SyncMonthAsync(tenantId, now.Year, now.Month, ct);
 
-        logger.LogInformation("Meta Ads sync completed for tenant {TenantId}", tenantId);
+            logger.LogInformation(
+                "Meta Ads sync job concluído — {Campaigns} campanhas, {AdSets} conjuntos, {Ads} anúncios",
+                summary.Campaigns, summary.AdSets, summary.Ads);
+        }
+        catch (MetaTokenException ex)
+        {
+            logger.LogError(ex,
+                "Meta Ads: token inválido — tenant {TenantId}. Gere um novo System User Token.", tenantId);
+            throw;
+        }
+        catch (MetaPermissionException ex)
+        {
+            logger.LogError(ex,
+                "Meta Ads: permissão insuficiente — tenant {TenantId}. Verifique escopo ads_read.", tenantId);
+            throw;
+        }
+        catch (MetaRateLimitException ex)
+        {
+            logger.LogWarning(ex,
+                "Meta Ads: rate limit — tenant {TenantId}. Hangfire fará retry.", tenantId);
+            throw;
+        }
     }
 }

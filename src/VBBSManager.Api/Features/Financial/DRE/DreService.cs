@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using VBBSManager.Api.Common.Results;
+using VBBSManager.Domain.Entities;
 using VBBSManager.Domain.Enums;
 using VBBSManager.Infrastructure.Persistence;
 
@@ -14,81 +15,114 @@ public class DreService(AppDbContext db) : IDreService
 {
     public async Task<Result<DreResponse>> ExecuteAsync(Guid tenantId, int year, int month, CancellationToken ct)
     {
+        if (year < 2020 || year > DateTime.UtcNow.Year + 1)
+            return Result<DreResponse>.Fail("Ano inválido.");
+        if (month < 1 || month > 12)
+            return Result<DreResponse>.Fail("Mês inválido (1–12).");
+
         var monthStart = new DateOnly(year, month, 1);
-        var monthEnd = monthStart.AddMonths(1);
+        var monthEnd   = new DateOnly(year, month, DateTime.DaysInMonth(year, month));
+
+        // ── Fontes de dados (sequencial — EF Core não suporta queries paralelas no mesmo contexto) ──
+        var sales = await db.DailySalesSummaries
+            .Where(x => x.TenantId == tenantId && x.Date >= monthStart && x.Date <= monthEnd)
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        var metaSpendSummaries = await db.DailyAdSpendSummaries
+            .Where(x => x.TenantId == tenantId && x.Date >= monthStart && x.Date <= monthEnd)
+            .AsNoTracking()
+            .ToListAsync(ct);
 
         var transactions = await db.CashFlowTransactions
-            .Where(t => t.TenantId == tenantId && t.Date >= monthStart && t.Date < monthEnd)
+            .Where(t => t.TenantId == tenantId && t.Date >= monthStart && t.Date <= monthEnd)
+            .AsNoTracking()
+            .ToListAsync(ct);
+
+        var fixedExpenses = await db.FixedExpenses
+            .Where(x => x.TenantId == tenantId && x.IsActive)
+            .AsNoTracking()
             .ToListAsync(ct);
 
         var config = await db.FinancialConfigs
+            .AsNoTracking()
             .FirstOrDefaultAsync(c => c.TenantId == tenantId, ct);
 
-        var hotmartPix = Sum(transactions, TransactionType.Income, CashFlowCategory.HotmartPix);
-        var hotmartCard = Sum(transactions, TransactionType.Income, CashFlowCategory.HotmartCard);
-        var otherIncome = Sum(transactions, TransactionType.Income, CashFlowCategory.OtherIncome);
-        var grossRevenue = hotmartPix + hotmartCard + otherIncome;
+        // ── Receita ──────────────────────────────────────────────────────────
+        var hotmartGross  = sales.Sum(r => r.GrossRevenue);  // real — Hotmart sync
+        var hotmartFee    = sales.Sum(r => r.HotmartFeeAmount); // real — calculado no sync
+        var totalSales    = sales.Sum(r => r.TotalSales);
 
-        var hotmartRevenue = hotmartPix + hotmartCard;
-        var adSpend = Sum(transactions, TransactionType.Expense, CashFlowCategory.MetaAds);
-        var actualTaxes = Sum(transactions, TransactionType.Expense, CashFlowCategory.Taxes);
-        var toolsExpense = Sum(transactions, TransactionType.Expense, CashFlowCategory.Tools);
-        var otherExpenses = Sum(transactions, TransactionType.Expense, CashFlowCategory.OtherExpense);
+        var otherIncome   = SumTx(transactions, TransactionType.Income, CashFlowCategory.OtherIncome);
+        var grossRevenue  = hotmartGross + otherIncome;
 
-        var hotmartFee = hotmartRevenue * (config?.HotmartFeePercent ?? 0.09m);
-        var installmentFee = hotmartRevenue * (config?.InstallmentSalesPercent ?? 0.33m) * (config?.InstallmentFeePercent ?? 0.0219m);
-        var federalTax = actualTaxes > 0
+        // ── Deduções ─────────────────────────────────────────────────────────
+        // Hotmart fee: real (do sync). Demais: estimados via config.
+        var installmentFee = hotmartGross
+            * (config?.InstallmentSalesPercent ?? 0.33m)
+            * (config?.InstallmentFeePercent   ?? 0.0219m);
+
+        var actualTaxes = SumTx(transactions, TransactionType.Expense, CashFlowCategory.Taxes);
+        var federalTax  = actualTaxes > 0
             ? actualTaxes
             : grossRevenue * (config?.FederalTaxPercent ?? 0.06m);
-        var refundCost = grossRevenue * (config?.RefundRatePercent ?? 0.01m);
-        var metaAdsTax = adSpend * (config?.MetaAdsTaxPercent ?? 0.10m);
 
-        var configFixed = config is null
-            ? 0m
-            : config.AccountingCost + config.InvoicingCost + config.ManychatCost + config.HotmartPlayerCost;
-        var fixedCosts = toolsExpense + otherExpenses + (toolsExpense + otherExpenses == 0 ? configFixed : 0m);
+        var refundCost  = grossRevenue * (config?.RefundRatePercent ?? 0.01m);
 
-        var totalDeductions = hotmartFee + installmentFee + federalTax + refundCost;
-        var netRevenue = grossRevenue - totalDeductions;
+        var netRevenue  = grossRevenue - hotmartFee - installmentFee - federalTax - refundCost;
+
+        // ── Custos variáveis — Meta Ads ───────────────────────────────────────
+        // Prefere resumo diário sincronizado; cai para lançamento manual se não há sync.
+        var metaSpendAuto   = metaSpendSummaries.Sum(r => r.TotalSpend);
+        var metaSpendManual = SumTx(transactions, TransactionType.Expense, CashFlowCategory.MetaAds);
+        var adSpend         = metaSpendAuto > 0 ? metaSpendAuto : metaSpendManual;
+        var metaAdsSynced   = metaSpendAuto > 0;
+
+        var metaAdsTax     = adSpend * (config?.MetaAdsTaxPercent ?? 0.10m);
         var adSpendWithTax = adSpend + metaAdsTax;
         var marginAfterTraffic = netRevenue - adSpendWithTax;
-        var operationalProfit = marginAfterTraffic - fixedCosts;
-        var marginPercent = grossRevenue > 0 ? operationalProfit / grossRevenue * 100 : 0;
 
-        var hasData = transactions.Count > 0;
-        var monthProjection = ComputeProjection(year, month, grossRevenue, operationalProfit);
-        var weeklyEvolution = BuildWeeklyEvolution(transactions, monthStart, monthEnd, config?.MetaAdsTaxPercent ?? 0.10m);
+        // ── Custos fixos ─────────────────────────────────────────────────────
+        // Gastos fixos cadastrados (FixedExpenses) + lançamentos avulsos no CashFlow
+        var fixedRegisteredTotal = fixedExpenses.Sum(x => x.Amount);
+        var toolsExpense         = SumTx(transactions, TransactionType.Expense, CashFlowCategory.Tools);
+        var otherExpenses        = SumTx(transactions, TransactionType.Expense, CashFlowCategory.OtherExpense);
+        var totalFixedCosts      = fixedRegisteredTotal + toolsExpense + otherExpenses;
+
+        var operationalProfit = marginAfterTraffic - totalFixedCosts;
+        var marginPercent     = grossRevenue > 0 ? operationalProfit / grossRevenue * 100 : 0;
+
+        var hasData          = sales.Count > 0 || transactions.Count > 0 || fixedExpenses.Count > 0;
+        var monthProjection  = ComputeProjection(year, month, grossRevenue, operationalProfit);
+        var weeklyEvolution  = BuildWeeklyEvolution(
+            monthStart, monthEnd, sales, metaSpendSummaries, transactions, metaAdsSynced,
+            config?.MetaAdsTaxPercent ?? 0.10m);
 
         var lines = BuildLines(
-            grossRevenue, hotmartPix, hotmartCard, otherIncome,
+            hotmartGross, otherIncome, grossRevenue,
             hotmartFee, installmentFee, federalTax, refundCost, actualTaxes,
-            netRevenue, adSpend, metaAdsTax, adSpendWithTax, marginAfterTraffic,
-            toolsExpense, otherExpenses, configFixed, fixedCosts, operationalProfit);
+            netRevenue, adSpend, metaAdsTax, adSpendWithTax, metaAdsSynced, marginAfterTraffic,
+            fixedExpenses, toolsExpense, otherExpenses, operationalProfit);
 
         return Result<DreResponse>.Ok(new DreResponse(
-            year,
-            month,
-            hasData,
-            new DreSummary(grossRevenue, netRevenue, operationalProfit, marginPercent, monthProjection),
-            lines,
-            weeklyEvolution
-        ));
+            year, month, hasData, metaAdsSynced,
+            new DreSummary(totalSales, grossRevenue, netRevenue, operationalProfit, marginPercent, monthProjection),
+            lines, weeklyEvolution));
     }
 
-    private static decimal Sum(
-        IEnumerable<Domain.Entities.CashFlowTransaction> txs,
+    private static decimal SumTx(
+        IEnumerable<CashFlowTransaction> txs,
         TransactionType type,
         CashFlowCategory category)
         => txs.Where(t => t.Type == type && t.Category == category).Sum(t => t.Amount);
 
     private static decimal ComputeProjection(int year, int month, decimal gross, decimal profit)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today      = DateOnly.FromDateTime(DateTime.UtcNow);
         var monthStart = new DateOnly(year, month, 1);
-        var monthEnd = monthStart.AddMonths(1).AddDays(-1);
+        var monthEnd   = monthStart.AddMonths(1).AddDays(-1);
 
-        if (today < monthStart || today > monthEnd)
-            return profit;
+        if (today < monthStart || today > monthEnd) return profit;
 
         var daysElapsed = today.Day;
         var daysInMonth = monthEnd.Day;
@@ -98,9 +132,12 @@ public class DreService(AppDbContext db) : IDreService
     }
 
     private static List<DreDataPoint> BuildWeeklyEvolution(
-        List<Domain.Entities.CashFlowTransaction> txs,
         DateOnly monthStart,
         DateOnly monthEnd,
+        List<DailySalesSummary> sales,
+        List<DailyAdSpendSummary> metaSummaries,
+        List<CashFlowTransaction> transactions,
+        bool metaAdsSynced,
         decimal metaAdsTaxPercent)
     {
         var points = new List<DreDataPoint>();
@@ -111,12 +148,17 @@ public class DreService(AppDbContext db) : IDreService
             var weekEnd = cursor.AddDays(6);
             if (weekEnd > monthEnd) weekEnd = monthEnd;
 
-            var weekTxs = txs.Where(t => t.Date >= cursor && t.Date <= weekEnd).ToList();
-            var revenue = weekTxs.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount);
-            var adSpend = weekTxs.Where(t => t.Category == CashFlowCategory.MetaAds).Sum(t => t.Amount);
-            var expenses = weekTxs.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount)
-                         + adSpend * metaAdsTaxPercent;
-            var margin = revenue - expenses;
+            var revenue = sales
+                .Where(s => s.Date >= cursor && s.Date <= weekEnd)
+                .Sum(s => s.GrossRevenue);
+
+            var adSpend = metaAdsSynced
+                ? metaSummaries.Where(m => m.Date >= cursor && m.Date <= weekEnd).Sum(m => m.TotalSpend)
+                : transactions
+                    .Where(t => t.Date >= cursor && t.Date <= weekEnd && t.Category == CashFlowCategory.MetaAds)
+                    .Sum(t => t.Amount);
+
+            var margin = revenue - adSpend - adSpend * metaAdsTaxPercent;
 
             points.Add(new DreDataPoint(cursor, revenue, adSpend, margin));
             cursor = weekEnd.AddDays(1);
@@ -126,41 +168,58 @@ public class DreService(AppDbContext db) : IDreService
     }
 
     private static List<DreLineDto> BuildLines(
-        decimal gross, decimal hotmartPix, decimal hotmartCard, decimal otherIncome,
+        decimal hotmartGross, decimal otherIncome, decimal grossRevenue,
         decimal hotmartFee, decimal installmentFee, decimal federalTax, decimal refundCost, decimal actualTaxes,
-        decimal netRevenue, decimal adSpend, decimal metaAdsTax, decimal adSpendWithTax, decimal marginAfterTraffic,
-        decimal toolsExpense, decimal otherExpenses, decimal configFixed, decimal fixedCosts, decimal operationalProfit)
+        decimal netRevenue, decimal adSpend, decimal metaAdsTax, decimal adSpendWithTax, bool metaAdsSynced,
+        decimal marginAfterTraffic,
+        List<FixedExpense> fixedExpenses, decimal toolsExpense, decimal otherExpenses,
+        decimal operationalProfit)
     {
-        decimal Pct(decimal v) => gross > 0 ? Math.Round(v / gross * 100, 1) : 0;
+        decimal Pct(decimal v) => grossRevenue > 0 ? Math.Round(v / grossRevenue * 100, 1) : 0;
 
         var lines = new List<DreLineDto>
         {
-            Line("gross", "Faturamento bruto", gross, "total", Pct(gross), false),
-            Line("section-income", "Receitas", 0, "section", null, false),
-            Line("hotmart-pix", "  Vendas Hotmart (Pix)", hotmartPix, "income", Pct(hotmartPix), false),
-            Line("hotmart-card", "  Vendas Hotmart (Cartão)", hotmartCard, "income", Pct(hotmartCard), false),
-            Line("other-income", "  Outras entradas", otherIncome, "income", Pct(otherIncome), false),
-            Line("section-deductions", "Deduções da plataforma", 0, "section", null, false),
-            Line("hotmart-fee", "  (−) Taxa Hotmart", -hotmartFee, "deduction", Pct(hotmartFee), true),
-            Line("installment-fee", "  (−) Antecipação cartão", -installmentFee, "deduction", Pct(installmentFee), true),
-            Line("federal-tax", actualTaxes > 0 ? "  (−) Impostos federais" : "  (−) Impostos federais (estimado)", -federalTax, "deduction", Pct(federalTax), actualTaxes == 0),
-            Line("refund", "  (−) Reembolsos (estimado)", -refundCost, "deduction", Pct(refundCost), true),
-            Line("net-revenue", "= Receita líquida", netRevenue, "subtotal", Pct(netRevenue), false),
-            Line("section-variable", "Custos variáveis", 0, "section", null, false),
-            Line("ad-spend", "  (−) Tráfego pago (Meta Ads)", -adSpend, "expense", Pct(adSpend), false),
-            Line("meta-tax", "  (−) Imposto Meta (estimado)", -metaAdsTax, "expense", Pct(metaAdsTax), true),
-            Line("margin-traffic", "= Margem após tráfego", marginAfterTraffic, "subtotal", Pct(marginAfterTraffic), false),
-            Line("section-fixed", "Custos fixos", 0, "section", null, false),
+            Line("gross",          "Faturamento bruto",       grossRevenue,  "total",    Pct(grossRevenue),  false),
+            Line("section-income", "Receitas",                0,             "section",  null,               false),
+            Line("hotmart",        "  Vendas Hotmart",        hotmartGross,  "income",   Pct(hotmartGross),  false),
         };
+
+        if (otherIncome > 0)
+            lines.Add(Line("other-income", "  Outras entradas", otherIncome, "income", Pct(otherIncome), false));
+
+        lines.AddRange([
+            Line("section-deductions", "Deduções",                                0,              "section",   null,               false),
+            Line("hotmart-fee",        "  (−) Taxa Hotmart",                      -hotmartFee,    "deduction", Pct(hotmartFee),    false),
+            Line("installment-fee",    "  (−) Antecipação cartão (estimado)",     -installmentFee,"deduction", Pct(installmentFee),true),
+            Line("federal-tax",        actualTaxes > 0
+                                           ? "  (−) Impostos federais"
+                                           : "  (−) Impostos federais (estimado)",-federalTax,   "deduction", Pct(federalTax),    actualTaxes == 0),
+            Line("refund",             "  (−) Reembolsos (estimado)",             -refundCost,    "deduction", Pct(refundCost),    true),
+            Line("net-revenue",        "= Receita líquida",                        netRevenue,    "subtotal",  Pct(netRevenue),    false),
+
+            Line("section-variable",   "Custos variáveis",                         0,             "section",   null,               false),
+            Line("ad-spend",           metaAdsSynced
+                                           ? "  (−) Meta Ads"
+                                           : "  (−) Meta Ads (manual)",           -adSpend,       "expense",   Pct(adSpend),      !metaAdsSynced),
+            Line("meta-tax",           "  (−) Imposto Meta (estimado)",            -metaAdsTax,   "expense",   Pct(metaAdsTax),   true),
+            Line("margin-traffic",     "= Margem após tráfego",                    marginAfterTraffic,"subtotal",Pct(marginAfterTraffic),false),
+
+            Line("section-fixed",      "Custos fixos",                             0,             "section",   null,               false),
+        ]);
+
+        for (var i = 0; i < fixedExpenses.Count; i++)
+        {
+            var fe = fixedExpenses[i];
+            lines.Add(Line($"fixed-{i}", $"  (−) {fe.Name}", -fe.Amount, "expense", Pct(fe.Amount), false));
+        }
 
         if (toolsExpense > 0)
             lines.Add(Line("tools", "  (−) Ferramentas / SaaS", -toolsExpense, "expense", Pct(toolsExpense), false));
         if (otherExpenses > 0)
             lines.Add(Line("other-expense", "  (−) Outras saídas", -otherExpenses, "expense", Pct(otherExpenses), false));
-        if (toolsExpense + otherExpenses == 0 && configFixed > 0)
-            lines.Add(Line("config-fixed", "  (−) Custos fixos (Planejamento)", -configFixed, "expense", Pct(configFixed), true));
 
         lines.Add(Line("operational-profit", "= Lucro operacional", operationalProfit, "total", Pct(operationalProfit), false));
+
         return lines;
     }
 

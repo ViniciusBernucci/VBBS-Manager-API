@@ -17,6 +17,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<FixedExpense> FixedExpenses => Set<FixedExpense>();
     public DbSet<FixedExpensePayment> FixedExpensePayments => Set<FixedExpensePayment>();
     public DbSet<DailySalesSummary> DailySalesSummaries => Set<DailySalesSummary>();
+    public DbSet<DailyAdSpendSummary> DailyAdSpendSummaries => Set<DailyAdSpendSummary>();
+    public DbSet<MetaCampaignDailyInsight> MetaCampaignDailyInsights => Set<MetaCampaignDailyInsight>();
+    public DbSet<MetaAdSetDailyInsight> MetaAdSetDailyInsights => Set<MetaAdSetDailyInsight>();
+    public DbSet<MetaAdDailyInsight> MetaAdDailyInsights => Set<MetaAdDailyInsight>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

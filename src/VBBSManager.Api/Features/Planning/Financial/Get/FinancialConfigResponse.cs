@@ -5,6 +5,7 @@ public record FinancialConfigResponse(
     decimal MonthlyGrossRevenue,
     decimal MonthlyAdSpend,
     decimal HotmartFeePercent,
+    decimal HotmartFixedFeePerTransaction,
     decimal InstallmentFeePercent,
     decimal InstallmentSalesPercent,
     decimal FederalTaxPercent,

@@ -5,28 +5,44 @@ namespace VBBSManager.Api.Features.Financial.DailySales;
 
 public interface IGetDailySalesService
 {
-    Task<DailySalesResponse?> ExecuteAsync(Guid tenantId, CancellationToken ct);
+    Task<DailySalesOverviewResponse> ExecuteAsync(Guid tenantId, DateOnly since, DateOnly until, CancellationToken ct);
 }
 
 public class GetDailySalesService(AppDbContext db) : IGetDailySalesService
 {
-    public async Task<DailySalesResponse?> ExecuteAsync(Guid tenantId, CancellationToken ct)
+    public async Task<DailySalesOverviewResponse> ExecuteAsync(
+        Guid tenantId, DateOnly since, DateOnly until, CancellationToken ct)
     {
-        // São Paulo = UTC-3. Brasil não adota horário de verão desde 2019.
-        var today = DateOnly.FromDateTime(DateTime.UtcNow.AddHours(-3));
+        var records = await db.DailySalesSummaries
+            .Where(x => x.TenantId == tenantId && x.Date >= since && x.Date <= until)
+            .OrderBy(x => x.Date)
+            .AsNoTracking()
+            .ToListAsync(ct);
 
-        var record = await db.DailySalesSummaries
-            .FirstOrDefaultAsync(x => x.TenantId == tenantId && x.Date == today, ct);
+        var hasData = records.Count > 0;
 
-        if (record is null)
-            return null;
+        var dailyStats = records
+            .Select(r => new DailySalesDailyPoint(
+                r.Date.ToString("yyyy-MM-dd"),
+                r.TotalSales,
+                r.GrossRevenue,
+                r.NetRevenue,
+                r.HotmartFeeAmount))
+            .ToList();
 
-        return new DailySalesResponse(
-            record.Date,
-            record.TotalSales,
-            record.GrossRevenue,
-            record.NetRevenue,
-            record.HotmartFeeAmount,
-            record.LastSyncedAt);
+        var lastSync = records.Count > 0
+            ? records.Max(r => r.LastSyncedAt).ToString("o")
+            : null;
+
+        return new DailySalesOverviewResponse(
+            Since:                since.ToString("yyyy-MM-dd"),
+            Until:                until.ToString("yyyy-MM-dd"),
+            HasData:              hasData,
+            TotalSales:           records.Sum(r => r.TotalSales),
+            TotalGrossRevenue:    records.Sum(r => r.GrossRevenue),
+            TotalNetRevenue:      records.Sum(r => r.NetRevenue),
+            TotalHotmartFeeAmount: records.Sum(r => r.HotmartFeeAmount),
+            LastSyncedAt:         lastSync,
+            DailyStats:           dailyStats);
     }
 }
