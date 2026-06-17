@@ -25,6 +25,13 @@ flowchart TD
     K --> L[12 Integração Hotmart]
     L --> M[13 Jobs Hangfire]
     M --> N[14 Docker completo]
+    N --> O[15 Logging Estruturado]
+    O --> P[16 IOptions Configuração]
+    P --> Q[17 Typed HTTP Clients + Polly]
+    Q --> R[18 EF Core Avançado]
+    R --> S[19 LINQ Avançado]
+    S --> T[20 Exceções Customizadas]
+    T --> U[21 Integração Meta Ads]
 ```
 
 ---
@@ -130,6 +137,24 @@ flowchart TD
 
 ---
 
+### Fase 8 — Infraestrutura de código avançada
+
+Estes documentos cobrem conceitos implementados no projeto que não estavam na trilha original. Leia na sequência — cada doc referencia os anteriores.
+
+| # | Documento | O que você aprende | Tempo estimado |
+|---|---|---|---|
+| **15** | [15-logging-estruturado.md](./15-logging-estruturado.md) | `ILogger<T>`, níveis de log, structured logging vs string interpolation, logging em middleware e jobs | 20 min |
+| **16** | [16-ioptions-configuracao.md](./16-ioptions-configuracao.md) | `IOptions<T>`, Settings classes tipadas, como variáveis de ambiente chegam às classes | 20 min |
+| **17** | [17-typed-http-clients-polly.md](./17-typed-http-clients-polly.md) | Typed HTTP Clients, `AddHttpClient<I,T>`, Polly, backoff exponencial, BaseAddress, URI encoding | 25 min |
+| **18** | [18-ef-core-avancado.md](./18-ef-core-avancado.md) | `AsNoTracking()`, `ExecuteDeleteAsync()`, transações com `BeginTransactionAsync`, `await using` | 25 min |
+| **19** | [19-linq-avancado.md](./19-linq-avancado.md) | `Select` com projeção e índice, `GroupBy`, `Dictionary<K,V>`, spread operator, `TryParse` + `InvariantCulture`, `DateTimeOffset` | 30 min |
+| **20** | [20-excecoes-customizadas.md](./20-excecoes-customizadas.md) | Quando usar Exception vs Result, hierarquia de exceções, `throw` vs `throw ex`, catch por nível | 20 min |
+| **21** | [21-integracao-meta-ads.md](./21-integracao-meta-ads.md) | Cursor-based pagination, hierarquia Campaign/AdSet/Ad, sync atômico, `omni_purchase`, tuplas de retorno | 45 min |
+
+> **Por que esta fase após Docker?** Os docs 15–21 cobrem padrões usados nas integrações externas (Meta Ads, Hotmart). São conceitos que fazem mais sentido depois de você ter o sistema rodando (docs 1–14).
+
+---
+
 ## Tabela resumida — todos os documentos
 
 | # | Arquivo | Fase | Tipo |
@@ -148,12 +173,19 @@ flowchart TD
 | 12 | `12-integracao-hotmart-vendas.md` | 6 | Aula integração |
 | 13 | `13-jobs.md` | 7 | Referência |
 | 14 | `14-docker.md` | 7 | Aula infra |
+| 15 | `15-logging-estruturado.md` | 8 | Aula |
+| 16 | `16-ioptions-configuracao.md` | 8 | Aula |
+| 17 | `17-typed-http-clients-polly.md` | 8 | Aula |
+| 18 | `18-ef-core-avancado.md` | 8 | Aula |
+| 19 | `19-linq-avancado.md` | 8 | Aula |
+| 20 | `20-excecoes-customizadas.md` | 8 | Aula |
+| 21 | `21-integracao-meta-ads.md` | 8 | Estudo de caso |
 
 ---
 
 ## Lacunas que esta trilha cobre
 
-Ao organizar a documentação, identificamos conceitos **não explicados** em nenhum doc antigo. Eles foram reunidos no **documento 01**:
+Ao organizar a documentação, identificamos conceitos **não explicados** em nenhum doc antigo. Eles foram reunidos em documentos específicos:
 
 | Lacuna | Onde foi resolvido |
 |---|---|
@@ -165,8 +197,15 @@ Ao organizar a documentação, identificamos conceitos **não explicados** em ne
 | appsettings vs .env vs `IConfiguration` | Doc 01, seção 7 |
 | JWT do painel vs OAuth da Hotmart | Doc 01, seção 8 |
 | O que são webhooks | Doc 01, seção 9 |
+| `ILogger<T>` e logging estruturado | Doc 15 |
+| `IOptions<T>` e configuração tipada | Doc 16 |
+| Typed HTTP Clients e retry com Polly | Doc 17 |
+| `AsNoTracking`, `ExecuteDeleteAsync`, transações | Doc 18 |
+| `GroupBy`, `Dictionary`, `TryParse` + `InvariantCulture` | Doc 19 |
+| Hierarquia de exceções customizadas | Doc 20 |
+| Cursor pagination, hierarquia Meta Ads, sync atômico | Doc 21 |
 
-**Ainda aprofundados nos docs originais** (não duplicados no 01):
+**Aprofundados nos docs originais** (não duplicados):
 
 | Conceito | Documento principal |
 |---|---|
@@ -174,6 +213,7 @@ Ao organizar a documentação, identificamos conceitos **não explicados** em ne
 | Multi-tenancy | Docs 05, 07, 08 |
 | Integração Hotmart linha a linha | Doc 12 |
 | Docker produção | Doc 14 |
+| Integração Meta Ads linha a linha | Doc 21 |
 
 ---
 
@@ -191,12 +231,22 @@ Ao organizar a documentação, identificamos conceitos **não explicados** em ne
 
 ### "Quero integrar APIs externas (Hotmart)"
 ```
-01 → 04 (seções 8, 14) → 11 → 12
+01 → 04 (seções 8, 14) → 11 → 12 → 16 → 17
+```
+
+### "Quero integrar a Meta Ads API"
+```
+15 → 16 → 17 → 18 → 19 → 20 → 21
 ```
 
 ### "Quero subir em produção na VPS"
 ```
 03 → 07 → 14 → 13
+```
+
+### "Quero entender os padrões avançados de infraestrutura de código"
+```
+15 → 16 → 17 → 18 → 19 → 20
 ```
 
 ---

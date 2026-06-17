@@ -43,15 +43,30 @@ Backoff: 2s → 4s → 8s.
 
 ---
 
-### MetaAdsClient *(a implementar — Fase 1)*
+### MetaAdsClient
 
-**Arquivo:** `src/VBBSManager.Infrastructure/ExternalClients/MetaAds/`
+**Documentação completa:** [Integração Meta Ads — Estudo de Caso Completo](./21-integracao-meta-ads.md)
 
-Métodos planejados:
-- `GetCampaignInsightsAsync(accessToken, from, to, ct)`
-- `GetAdCreativeInsightsAsync(accessToken, from, to, ct)`
+**Arquivos:** `src/VBBSManager.Infrastructure/ExternalClients/Meta/`
 
-Autenticação: OAuth 2.0 — access token de longa duração obtido via fluxo de autorização do Meta.
+| Classe / Interface | Método | Descrição |
+|---|---|---|
+| `IMetaAdsClient` | `GetDailyInsightsByLevelAsync(level, since, until, ct)` | Busca insights por nível (campaign/adset/ad) com paginação por cursor |
+| `IMetaAdsMonthSyncService` | `SyncMonthAsync(tenantId, year, month, ct)` | Busca os 3 níveis + persiste atomicamente no banco |
+
+O `HttpClient` é injetado com retry via Polly:
+
+```csharp
+services.AddHttpClient<IMetaAdsClient, MetaAdsClient>(client =>
+{
+    client.BaseAddress = new Uri($"https://graph.facebook.com/{metaApiVersion}/");
+    client.Timeout = TimeSpan.FromSeconds(30);
+})
+.AddTransientHttpErrorPolicy(p =>
+    p.WaitAndRetryAsync(3, attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt))));
+```
+
+Autenticação: System User Token (long-lived) passado como query parameter `access_token`.
 
 ---
 

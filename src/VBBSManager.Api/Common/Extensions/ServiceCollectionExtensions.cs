@@ -27,6 +27,7 @@ using VBBSManager.Api.Features.Planning.Financial.Get;
 using VBBSManager.Api.Features.Planning.Financial.Update;
 using VBBSManager.Api.Features.Planning.Goals.Get;
 using VBBSManager.Api.Features.Planning.Goals.Update;
+using VBBSManager.Api.Features.Dashboard.Overview;
 using VBBSManager.Api.Features.Traffic.Overview;
 using VBBSManager.Api.Features.Traffic.Sync;
 using VBBSManager.Api.Features.Webhooks.Brevo;
@@ -167,6 +168,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IGetMonthlyStatusService, GetMonthlyStatusService>();
         services.AddScoped<ITrafficSyncService, TrafficSyncService>();
         services.AddScoped<ITrafficOverviewService, TrafficOverviewService>();
+        services.AddScoped<IDashboardOverviewService, DashboardOverviewService>();
 
         return services;
     }
